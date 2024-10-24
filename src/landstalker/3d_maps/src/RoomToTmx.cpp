@@ -228,11 +228,13 @@ for (const auto& entity : entities) {
 
     auto palette_property = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
     palette_property->AddAttribute("name", "Palette");
+	palette_property->AddAttribute("type", "int");
     palette_property->AddAttribute("value", std::to_string(entity.GetPalette()));
     properties->AddChild(palette_property);
 
     auto behaviour_property = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
     behaviour_property->AddAttribute("name", "Behaviour");
+	behaviour_property->AddAttribute("type", "int");
     behaviour_property->AddAttribute("value", std::to_string(entity.GetBehaviour()));
     properties->AddChild(behaviour_property);
 
@@ -291,7 +293,7 @@ for (const auto& entity : entities) {
 
     auto speed_property = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
     speed_property->AddAttribute("name", "Speed");
-	speed_property->AddAttribute("type", "bool");
+	speed_property->AddAttribute("type", "int");
     speed_property->AddAttribute("value", std::to_string(entity.GetSpeed()));
     properties->AddChild(speed_property);
 

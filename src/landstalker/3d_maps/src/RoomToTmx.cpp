@@ -8,10 +8,10 @@
 #include <wx/filename.h>
 #include <wx/xml/xml.h>
 
-bool RoomToTmx::ExportToTmx(const std::string& fname, int roomnum, std::shared_ptr<GameData> gameData, const std::string& blockset_filename)
+bool RoomToTmx::ExportToTmx(const std::string& fname, int roomnum, std::shared_ptr<GameData> gameData, const std::string& blockset_filename, const std::shared_ptr<Blockset> blockset)
 {
 	std::shared_ptr<RoomData> roomData = gameData->GetRoomData();
-	wxXmlDocument tmx = MapToTmx::GenerateXmlDocument(fname, *(roomData->GetMapForRoom(roomnum)->GetData()), blockset_filename);
+	wxXmlDocument tmx = MapToTmx::GenerateXmlDocument(fname, *(roomData->GetMapForRoom(roomnum)->GetData()), blockset_filename, blockset);
 
 	// Properties
 	auto room = roomData->GetRoom(roomnum);
@@ -228,11 +228,13 @@ for (const auto& entity : entities) {
 
     auto palette_property = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
     palette_property->AddAttribute("name", "Palette");
+	palette_property->AddAttribute("type", "int");
     palette_property->AddAttribute("value", std::to_string(entity.GetPalette()));
     properties->AddChild(palette_property);
 
     auto behaviour_property = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
     behaviour_property->AddAttribute("name", "Behaviour");
+	behaviour_property->AddAttribute("type", "int");
     behaviour_property->AddAttribute("value", std::to_string(entity.GetBehaviour()));
     properties->AddChild(behaviour_property);
 

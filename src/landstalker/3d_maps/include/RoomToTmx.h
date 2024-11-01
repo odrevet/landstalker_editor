@@ -8,7 +8,7 @@
 class RoomToTmx
 {
 public:
-	static bool ExportToTmx(const std::string& fname, int roomnum, std::shared_ptr<GameData> gameData, const std::string& blockset_filename);
+	static bool ExportToTmx(const std::string& fname, int roomnum, std::shared_ptr<GameData> gameData, const std::string& blockset_filename, const std::shared_ptr<Blockset> blockset);
 };
 
 #endif // _ROOM_TO_TMX_H_

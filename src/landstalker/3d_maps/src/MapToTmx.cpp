@@ -90,7 +90,7 @@ bool MapToTmx::ImportFromTmx(const std::string& fname, Tilemap3D& map)
 	return false;
 }
 
-wxXmlDocument MapToTmx::GenerateXmlDocument(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename)
+wxXmlDocument MapToTmx::GenerateXmlDocument(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename, const std::shared_ptr<Blockset> blockset)
 {
 	wxXmlDocument tmx;
 	wxFileName fn(fname);
@@ -117,6 +117,50 @@ wxXmlDocument MapToTmx::GenerateXmlDocument(const std::string& fname, const Tile
 	tileset->AddAttribute("tileheight", "16");
 	tileset->AddAttribute("tilecount", "1024");
 	tileset->AddAttribute("columns", "16");
+
+
+	int blocksetId = 0;
+    for (const MapBlock& block : *blockset) {
+		auto tile = new wxXmlNode(wxXML_ELEMENT_NODE, "tile");
+		tile->AddAttribute("id", std::to_string(blocksetId));
+
+		auto properties = new wxXmlNode(wxXML_ELEMENT_NODE, "properties");
+		tile->AddChild(properties);
+
+
+        for (size_t tileIndex = 0; tileIndex < block.GetBlockSize(); ++tileIndex) {
+            const Tile& tile = block.GetTile(tileIndex);
+
+            const TileAttributes& attributes = tile.Attributes();
+
+            // Access each attribute
+            bool isHFlipped = attributes.getAttribute(TileAttributes::Attribute::ATTR_HFLIP);
+            bool isVFlipped = attributes.getAttribute(TileAttributes::Attribute::ATTR_VFLIP);
+            bool hasPriority = attributes.getAttribute(TileAttributes::Attribute::ATTR_PRIORITY);
+
+			auto propertyIsHFlipped = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
+			propertyIsHFlipped->AddAttribute("name", wxString::Format("%disHFlipped", tileIndex));
+			propertyIsHFlipped->AddAttribute("type", "bool");
+			propertyIsHFlipped->AddAttribute("value", isHFlipped ? "true" : "false");
+			properties->AddChild(propertyIsHFlipped);
+
+			auto propertyIsVFlipped = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
+			propertyIsVFlipped->AddAttribute("name", wxString::Format("%disVFlipped", tileIndex));
+			propertyIsVFlipped->AddAttribute("type", "bool");
+			propertyIsVFlipped->AddAttribute("value", isVFlipped ? "true" : "false");
+			properties->AddChild(propertyIsVFlipped);
+
+			auto propertyHasPriority = new wxXmlNode(wxXML_ELEMENT_NODE, "property");
+			propertyHasPriority->AddAttribute("name", wxString::Format("%dhasPriority", tileIndex));
+			propertyHasPriority->AddAttribute("type", "bool");
+			propertyHasPriority->AddAttribute("value", hasPriority ? "true" : "false");
+			properties->AddChild(propertyHasPriority);
+        }
+		blocksetId++;
+		tileset->AddChild(tile);
+    }
+
+
 
 	auto image = new wxXmlNode(wxXML_ELEMENT_NODE, "image");
 	image->AddAttribute("source", blockset_filename);
@@ -155,8 +199,8 @@ wxXmlDocument MapToTmx::GenerateXmlDocument(const std::string& fname, const Tile
 	return tmx;
 }
 
-bool MapToTmx::ExportToTmx(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename)
+bool MapToTmx::ExportToTmx(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename, const std::shared_ptr<Blockset> blockset)
 {
-	wxXmlDocument tmx = MapToTmx::GenerateXmlDocument(fname, map, blockset_filename);
+	wxXmlDocument tmx = MapToTmx::GenerateXmlDocument(fname, map, blockset_filename, blockset);
 	return tmx.Save(fname);
 }

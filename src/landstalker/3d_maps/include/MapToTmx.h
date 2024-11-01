@@ -9,8 +9,8 @@ class MapToTmx
 {
 public:
 	static bool ImportFromTmx(const std::string& fname, Tilemap3D& map);
-	static wxXmlDocument GenerateXmlDocument(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename);
-	static bool ExportToTmx(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename);
+	static wxXmlDocument GenerateXmlDocument(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename, const std::shared_ptr<Blockset> blockset);
+	static bool ExportToTmx(const std::string& fname, const Tilemap3D& map, const std::string& blockset_filename, const std::shared_ptr<Blockset> blockset);
 };
 
 #endif // _MAP_TO_TMX_H_

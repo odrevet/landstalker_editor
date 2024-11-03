@@ -11,6 +11,7 @@ enum MENU_IDS
 	ID_FILE_EXPORT_TILES,
 	ID_FILE_EXPORT_VDPMAP,
 	ID_FILE_EXPORT_PNG,
+	ID_FILE_EXPORT_PNG_ANIMATION,
 	ID_FILE_IMPORT_FRM,
 	ID_FILE_IMPORT_TILES,
 	ID_FILE_IMPORT_VDPMAP,
@@ -19,6 +20,7 @@ enum MENU_IDS
 	ID_VIEW_TOGGLE_ALPHA,
 	ID_VIEW_TOGGLE_HITBOX,
 	ID_VIEW_SEP1,
+	ID_VIEW_SEP2,
 	ID_VIEW_TOOLBAR,
 	ID_VIEW_FRAMES,
 	ID_VIEW_SUBSPRITES,
@@ -166,7 +168,7 @@ bool SpriteEditorFrame::Open(uint8_t spr, int frame, int anim, int ent)
 	return true;
 }
 
-bool SpriteEditorFrame::OpenFrame(uint8_t spr, int frame, int anim, int ent)
+bool SpriteEditorFrame::OpenFrame(uint8_t spr, int frame, int anim, int ent, bool fullUpdate)
 {
 	if (m_gd == nullptr)
 	{
@@ -204,7 +206,17 @@ bool SpriteEditorFrame::OpenFrame(uint8_t spr, int frame, int anim, int ent)
 	m_tileedit->SetTile(m_spriteeditor->GetFirstTile());
 	m_spriteeditor->SelectTile(m_spriteeditor->GetFirstTile());
 	m_reset_props = true;
-	Update();
+	
+	if(fullUpdate)
+	{
+		Update();
+	}
+	else{
+		UpdateUI();
+		FireEvent(EVT_PROPERTIES_UPDATE);
+		FireEvent(EVT_STATUSBAR_UPDATE);
+	}
+
 	return true;
 }
 
@@ -319,14 +331,16 @@ void SpriteEditorFrame::InitMenu(wxMenuBar& menu, ImageList& ilist) const
 	AddMenuItem(fileMenu, 1, ID_FILE_EXPORT_TILES, "Export Sprite Tileset as Binary...");
 	AddMenuItem(fileMenu, 2, ID_FILE_EXPORT_VDPMAP, "Export VDP Sprite Map as CSV...");
 	AddMenuItem(fileMenu, 3, ID_FILE_EXPORT_PNG, "Export Sprite as PNG...");
-	AddMenuItem(fileMenu, 4, ID_FILE_IMPORT_FRM, "Import Sprite Frame from Binary...");
-	AddMenuItem(fileMenu, 5, ID_FILE_IMPORT_TILES, "Import Sprite Tileset from Binary...");
-	AddMenuItem(fileMenu, 6, ID_FILE_IMPORT_VDPMAP, "Import VDP Sprite Map from CSV...");
+	AddMenuItem(fileMenu, 4, ID_FILE_EXPORT_PNG_ANIMATION, "Export Sprite Animation as PNG...");
+	AddMenuItem(fileMenu, 5, ID_VIEW_SEP1, "", wxITEM_SEPARATOR);
+	AddMenuItem(fileMenu, 6, ID_FILE_IMPORT_FRM, "Import Sprite Frame from Binary...");
+	AddMenuItem(fileMenu, 7, ID_FILE_IMPORT_TILES, "Import Sprite Tileset from Binary...");
+	AddMenuItem(fileMenu, 8, ID_FILE_IMPORT_VDPMAP, "Import VDP Sprite Map from CSV...");
 	auto& viewMenu = AddMenu(menu, 1, ID_VIEW, "View");
 	AddMenuItem(viewMenu, 0, ID_VIEW_TOGGLE_GRIDLINES, "Gridlines", wxITEM_CHECK);
 	AddMenuItem(viewMenu, 1, ID_VIEW_TOGGLE_ALPHA, "Show Alpha as Black", wxITEM_CHECK);
 	AddMenuItem(viewMenu, 2, ID_VIEW_TOGGLE_HITBOX, "Hitbox", wxITEM_CHECK);
-	AddMenuItem(viewMenu, 3, ID_VIEW_SEP1, "", wxITEM_SEPARATOR);
+	AddMenuItem(viewMenu, 3, ID_VIEW_SEP2, "", wxITEM_SEPARATOR);
 	AddMenuItem(viewMenu, 4, ID_VIEW_TOOLBAR, "Toolbar", wxITEM_CHECK);
 	AddMenuItem(viewMenu, 5, ID_VIEW_EDITOR, "Tile Editor", wxITEM_CHECK);
 	AddMenuItem(viewMenu, 6, ID_VIEW_PALETTE, "Palette", wxITEM_CHECK);
@@ -397,6 +411,9 @@ void SpriteEditorFrame::ProcessEvent(int id)
 		break;
 	case ID_FILE_EXPORT_PNG:
 		OnExportPng();
+		break;
+	case ID_FILE_EXPORT_PNG_ANIMATION:
+		OnExportPngAnimation();
 		break;
 	case ID_FILE_IMPORT_FRM:
 		OnImportFrm();
@@ -537,6 +554,32 @@ void SpriteEditorFrame::ExportPng(const std::string& filename) const
 	int height = m_sprite->GetData()->GetHeight();
 	ImageBuffer buf(width, height);
 	buf.InsertSprite(-m_sprite->GetData()->GetLeft(), -m_sprite->GetData()->GetTop(), 0, *m_sprite->GetData());
+	buf.WritePNG(filename, { m_palette }, true);
+}
+
+void SpriteEditorFrame::ExportPngAnimation(const std::string& filename) const
+{
+	std::vector<std::string> frames = m_gd->GetSpriteData()->GetSpriteAnimationFrames(m_sprite->GetSprite(), m_anim);
+
+	int width = 0;
+	int height = 0;
+	for (const auto& frame : frames) {
+		std::shared_ptr<SpriteFrameEntry> spriteFrame = m_gd->GetSpriteData()->GetSpriteFrame(frame);
+		width += spriteFrame->GetData()->GetWidth();
+		if(spriteFrame->GetData()->GetHeight() > height) {
+			height = spriteFrame->GetData()->GetHeight();
+		}
+	}
+
+	ImageBuffer buf(width, height);
+	int draw_x = 0;
+	for (const auto& frame : frames) {
+		std::shared_ptr<SpriteFrameEntry> spriteFrame = m_gd->GetSpriteData()->GetSpriteFrame(frame);
+		int draw_y = height - spriteFrame->GetData()->GetHeight();
+		buf.InsertSprite(-spriteFrame->GetData()->GetLeft() + draw_x, -spriteFrame->GetData()->GetTop() + draw_y, 0, *spriteFrame->GetData());
+		draw_x += spriteFrame->GetData()->GetWidth();
+	}
+
 	buf.WritePNG(filename, { m_palette }, true);
 }
 
@@ -1105,7 +1148,8 @@ void SpriteEditorFrame::OnAnimationSelect(wxCommandEvent& evt)
 		m_animframectrl->SetAnimation(m_sprite->GetSprite(), m_anim);
 		std::string first_frame_name = m_gd->GetSpriteData()->GetSpriteAnimationFrames(m_sprite->GetSprite(), m_anim)[0];
 		m_frame = m_gd->GetSpriteData()->GetSpriteFrameId(m_sprite->GetSprite(), first_frame_name);
-		OpenFrame(m_sprite->GetSprite(), m_frame, m_anim);
+
+		OpenFrame(m_sprite->GetSprite(), m_frame, m_anim, -1, false);
 		m_framectrl->SetSelected(m_frame + 1);
 		m_animctrl->SetSelected(m_anim + 1);
 	}
@@ -1223,23 +1267,38 @@ void SpriteEditorFrame::OnAnimationFrameAdd(wxCommandEvent& evt)
 
 void SpriteEditorFrame::OnAnimationFrameDelete(wxCommandEvent& evt)
 {
-	if (evt.GetInt() > 0 && evt.GetInt() <= static_cast<int>(m_gd->GetSpriteData()->GetSpriteAnimationFrames(m_sprite->GetSprite(), m_anim).size()))
+	int framesCount = static_cast<int>(m_gd->GetSpriteData()->GetSpriteAnimationFrames(m_sprite->GetSprite(), m_anim).size());
+
+	if (evt.GetInt() > 0 && evt.GetInt() <= framesCount && framesCount > 1)
 	{
+		int deleteIndex = evt.GetInt() - 1;
+
 		std::string anim = m_gd->GetSpriteData()->GetSpriteAnimations(m_sprite->GetSprite())[m_anim];
-		int new_frame = evt.GetInt() - 1;
-		if (new_frame > static_cast<int>(m_gd->GetSpriteData()->GetSpriteAnimationFrameCount(anim)))
-		{
-			new_frame = static_cast<int>(m_gd->GetSpriteData()->GetSpriteAnimationFrameCount(anim)) - 1;
+
+		// Delete the frame
+		m_gd->GetSpriteData()->DeleteSpriteAnimationFrame(anim, deleteIndex);
+		framesCount--;
+
+		// Update preview frame
+		int selectIndex = deleteIndex;
+		if(selectIndex >= framesCount){
+			selectIndex = framesCount - 1;
+
 		}
-		m_gd->GetSpriteData()->DeleteSpriteAnimationFrame(anim, new_frame);
+
 		m_animframectrl->SetAnimation(m_sprite->GetSprite(), m_anim);
-		m_preview->SetAnimationFrame(new_frame);
-		m_frame = m_gd->GetSpriteData()->GetSpriteFrameId(m_sprite->GetSprite(), m_gd->GetSpriteData()->GetSpriteAnimationFrames(anim)[new_frame]);
+		m_preview->SetAnimationFrame(selectIndex);
+		m_frame = m_gd->GetSpriteData()->GetSpriteFrameId(m_sprite->GetSprite(), m_gd->GetSpriteData()->GetSpriteAnimationFrames(anim)[selectIndex]);
 		m_sprite = m_gd->GetSpriteData()->GetSpriteFrame(m_sprite->GetSprite(), m_frame);
 		OpenFrame(m_sprite->GetSprite(), m_frame, m_anim);
 		m_framectrl->SetSelected(m_frame + 1);
 		m_animctrl->SetSelected(m_anim + 1);
-		m_animframectrl->SetSelected(evt.GetInt());
+
+		if(framesCount == deleteIndex )
+		{
+			m_animframectrl->SetSelected(framesCount);
+		}
+		
 		UpdateUI();
 	}
 }
@@ -1280,16 +1339,19 @@ void SpriteEditorFrame::OnAnimationFrameChange(wxCommandEvent& evt)
 	{
 		std::string anim = m_gd->GetSpriteData()->GetSpriteAnimations(m_sprite->GetSprite())[m_anim];
 		std::string new_frame = ShowFrameDialog(StrPrintf("Change frame \"%s\" to:", evt.GetString().c_str().AsChar()), "Change frame");
-		m_gd->GetSpriteData()->ChangeSpriteAnimationFrame(anim, evt.GetInt() - 1, new_frame);
-		m_animframectrl->SetAnimation(m_sprite->GetSprite(), m_anim);
-		m_preview->SetAnimationFrame(evt.GetInt() - 1);
-		m_frame = m_gd->GetSpriteData()->GetSpriteFrameId(m_sprite->GetSprite(), new_frame);
-		m_sprite = m_gd->GetSpriteData()->GetSpriteFrame(m_sprite->GetSprite(), m_frame);
-		OpenFrame(m_sprite->GetSprite(), m_frame, m_anim);
-		m_framectrl->SetSelected(m_frame + 1);
-		m_animctrl->SetSelected(m_anim + 1);
-		m_animframectrl->SetSelected(evt.GetInt());
-		UpdateUI();
+		if (!new_frame.empty())
+		{
+			m_gd->GetSpriteData()->ChangeSpriteAnimationFrame(anim, evt.GetInt() - 1, new_frame);
+			m_animframectrl->SetAnimation(m_sprite->GetSprite(), m_anim);
+			m_preview->SetAnimationFrame(evt.GetInt() - 1);
+			m_frame = m_gd->GetSpriteData()->GetSpriteFrameId(m_sprite->GetSprite(), new_frame);
+			m_sprite = m_gd->GetSpriteData()->GetSpriteFrame(m_sprite->GetSprite(), m_frame);
+			OpenFrame(m_sprite->GetSprite(), m_frame, m_anim);
+			m_framectrl->SetSelected(m_frame + 1);
+			m_animctrl->SetSelected(m_anim + 1);
+			m_animframectrl->SetSelected(evt.GetInt());
+			UpdateUI();
+		}
 	}
 }
 
@@ -1404,6 +1466,16 @@ void SpriteEditorFrame::OnExportPng()
 	if (fd.ShowModal() != wxID_CANCEL)
 	{
 		ExportPng(fd.GetPath().ToStdString());
+	}
+}
+
+void SpriteEditorFrame::OnExportPngAnimation()
+{
+	const wxString default_file = StrPrintf("SpriteGfx%03dAnim%03d.png", m_sprite->GetSprite(), m_anim);
+	wxFileDialog fd(this, _("Export Sprite Animation As PNG"), "", default_file, "PNG Image (*.png)|*.png|All Files (*.*)|*.*", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+	if (fd.ShowModal() != wxID_CANCEL)
+	{
+		ExportPngAnimation(fd.GetPath().ToStdString());
 	}
 }
 

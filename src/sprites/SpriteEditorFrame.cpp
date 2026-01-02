@@ -599,7 +599,7 @@ void SpriteEditorFrame::ExportYamlAnimation(const std::string& dirname) const
         const std::string& anim_name = animations[anim_idx];
 
         // Build the output filename
-        std::string filename = dirname + "/" + StrPrintf("SpriteGfx%03dAnim%02d.yaml", m_sprite->GetSprite(), anim_idx);
+        std::string filename = dirname + "/" + Landstalker::StrPrintf("SpriteGfx%03dAnim%02d.yaml", m_sprite->GetSprite(), anim_idx);
 
         std::ofstream fs(filename, std::ios::out | std::ios::trunc);
 

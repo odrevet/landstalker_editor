@@ -12,6 +12,7 @@ enum MENU_IDS
 	ID_FILE_EXPORT_VDPMAP,
 	ID_FILE_EXPORT_PNG,
 	ID_FILE_EXPORT_PNG_ANIMATION,
+	ID_FILE_EXPORT_YAML_ANIMATION,
 	ID_FILE_IMPORT_FRM,
 	ID_FILE_IMPORT_TILES,
 	ID_FILE_IMPORT_VDPMAP,
@@ -333,10 +334,11 @@ void SpriteEditorFrame::InitMenu(wxMenuBar& menu, ImageList& ilist) const
 	AddMenuItem(fileMenu, 2, ID_FILE_EXPORT_VDPMAP, "Export VDP Sprite Map as CSV...");
 	AddMenuItem(fileMenu, 3, ID_FILE_EXPORT_PNG, "Export Sprite as PNG...");
 	AddMenuItem(fileMenu, 4, ID_FILE_EXPORT_PNG_ANIMATION, "Export Sprite Animation as PNG...");
-	AddMenuItem(fileMenu, 5, ID_VIEW_SEP1, "", wxITEM_SEPARATOR);
-	AddMenuItem(fileMenu, 6, ID_FILE_IMPORT_FRM, "Import Sprite Frame from Binary...");
-	AddMenuItem(fileMenu, 7, ID_FILE_IMPORT_TILES, "Import Sprite Tileset from Binary...");
-	AddMenuItem(fileMenu, 8, ID_FILE_IMPORT_VDPMAP, "Import VDP Sprite Map from CSV...");
+	AddMenuItem(fileMenu, 5, ID_FILE_EXPORT_YAML_ANIMATION, "Export Sprite Animation as YAML...");
+	AddMenuItem(fileMenu, 6, ID_VIEW_SEP1, "", wxITEM_SEPARATOR);
+	AddMenuItem(fileMenu, 7, ID_FILE_IMPORT_FRM, "Import Sprite Frame from Binary...");
+	AddMenuItem(fileMenu, 8, ID_FILE_IMPORT_TILES, "Import Sprite Tileset from Binary...");
+	AddMenuItem(fileMenu, 9, ID_FILE_IMPORT_VDPMAP, "Import VDP Sprite Map from CSV...");
 	auto& viewMenu = AddMenu(menu, 1, ID_VIEW, "View");
 	AddMenuItem(viewMenu, 0, ID_VIEW_TOGGLE_GRIDLINES, "Gridlines", wxITEM_CHECK);
 	AddMenuItem(viewMenu, 1, ID_VIEW_TOGGLE_ALPHA, "Show Alpha as Black", wxITEM_CHECK);
@@ -415,6 +417,9 @@ void SpriteEditorFrame::ProcessEvent(int id)
 		break;
 	case ID_FILE_EXPORT_PNG_ANIMATION:
 		OnExportPngAnimation();
+		break;
+	case ID_FILE_EXPORT_YAML_ANIMATION:
+		OnExportYamlAnimation();
 		break;
 	case ID_FILE_IMPORT_FRM:
 		OnImportFrm();
@@ -582,6 +587,45 @@ void SpriteEditorFrame::ExportPngAnimation(const std::string& filename) const
 	}
 
 	buf.WritePNG(filename, { m_palette }, true);
+}
+
+void SpriteEditorFrame::ExportYamlAnimation(const std::string& dirname) const
+{
+    // Get all animations for the current sprite
+    std::vector<std::string> animations = m_gd->GetSpriteData()->GetSpriteAnimations(m_sprite->GetSprite());
+
+    for (size_t anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
+    {
+        const std::string& anim_name = animations[anim_idx];
+
+        // Build the output filename
+        std::string filename = dirname + "/" + StrPrintf("SpriteGfx%03dAnim%02d.yaml", m_sprite->GetSprite(), anim_idx);
+
+        std::ofstream fs(filename, std::ios::out | std::ios::trunc);
+
+        // Get all frames in this animation
+        std::vector<std::string> anim_frames = m_gd->GetSpriteData()->GetSpriteAnimationFrames(m_sprite->GetSprite(), anim_idx);
+
+        fs << "animation: " << anim_name << std::endl;
+        fs << "frames:" << std::endl;
+
+        for (const auto& frame_name : anim_frames)
+        {
+            auto frame_sprite = m_gd->GetSpriteData()->GetSpriteFrame(frame_name);
+
+            fs << "  - frame: " << frame_name << std::endl;
+            fs << "    compressed: " << (frame_sprite->GetData()->GetCompressed() ? "true" : "false") << std::endl;
+            fs << "    subsprites:" << std::endl;
+
+            for (std::size_t i = 0; i < frame_sprite->GetData()->GetSubSpriteCount(); ++i)
+            {
+                const auto& data = frame_sprite->GetData()->GetSubSprite(i);
+                fs << "      - [" << data.x << ", " << data.y << ", " << data.w << ", " << data.h << "]" << std::endl;
+            }
+        }
+
+        fs.close();
+    }
 }
 
 void SpriteEditorFrame::ImportFrm(const std::string& filename)
@@ -1493,6 +1537,16 @@ void SpriteEditorFrame::OnExportPngAnimation()
 	if (fd.ShowModal() != wxID_CANCEL)
 	{
 		ExportPngAnimation(fd.GetPath().ToStdString());
+	}
+}
+
+void SpriteEditorFrame::OnExportYamlAnimation()
+{
+	wxDirDialog dd(this, "Export Animation Informations As YAML");
+
+	if (dd.ShowModal() != wxID_CANCEL)
+	{
+		ExportYamlAnimation(dd.GetPath().ToStdString());
 	}
 }
 
